@@ -20,12 +20,35 @@ interface CustomItem {
   creator?: string;
   categories?: string[];
   mediaContent?: string;
+  guid?: string;
   [key: string]: unknown;
 }
 
 interface CustomParser extends Parser<CustomFeed, CustomItem> {
   customFields: {
     item: string[];
+  };
+}
+
+interface RedditPost {
+  id: string;
+  title: string;
+  selftext: string;
+  selftext_html: string;
+  url: string;
+  permalink: string;
+  created_utc: number;
+  link_flair_text?: string;
+}
+
+interface RedditChild {
+  kind: string;
+  data: RedditPost;
+}
+
+interface RedditResponse {
+  data: {
+    children: RedditChild[];
   };
 }
 
@@ -81,7 +104,7 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
           response
         } as FetchError;
       }
-      const data = await response.json();
+      const data = await response.json() as RedditResponse;
       return parseRedditFeed(data, source);
     }
 
@@ -104,7 +127,7 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
       id: item.guid || item.link || `${source.id}-${Date.now()}`,
       title: item.title || 'Untitled',
       description: item.contentSnippet || item.description || '',
-      content: (item as any).contentEncoded || (item as any).content || item.description || '',
+      content: item.contentEncoded || item.content || item.description || '',
       link: item.link || '',
       pubDate: item.isoDate || item.pubDate || new Date().toISOString(),
       feedSource: source.name,
@@ -118,12 +141,12 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
   }
 }
 
-function parseRedditFeed(data: any, source: FeedSource): FeedItem[] {
+function parseRedditFeed(data: RedditResponse, source: FeedSource): FeedItem[] {
   if (!data.data?.children) return [];
 
   return data.data.children
-    .filter((child: any) => child.kind === 't3') // Only posts, not comments
-    .map((child: any) => {
+    .filter((child) => child.kind === 't3') // Only posts, not comments
+    .map((child) => {
       const post = child.data;
       return {
         id: post.id,
