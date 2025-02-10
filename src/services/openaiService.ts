@@ -788,51 +788,34 @@ export async function generateSoWhat(
   answers: { answer: string }[],
   companyContext: CompanyContext = CIBC_CONTEXT
 ): Promise<string> {
-  const prompt = `
-As a strategic advisor for ${companyContext.name}, analyze this tech event's relevance to our organization:
+  const questionsAndAnswers = questions.map((q, i) => `${q.question}: ${answers[i].answer}`).join('\n');
+  const prompt = `You are a strategic technology analyst for CIBC, one of Canada's leading banks. Analyze the following tech event and provide specific, actionable insights focused on:
 
-EVENT DETAILS:
-- Name: ${eventName}
-- Description: ${description}
-- Key Questions: ${questions.map(q => q.question).join(', ')}
-- Answers: ${answers.map(a => a.answer).join(', ')}
+1. Concrete Financial/Market Impact:
+   - Key financial metrics and market performance
+   - Specific revenue/growth numbers
+   - Market share changes
+   - Competitive positioning shifts
 
-COMPANY CONTEXT:
-${companyContext.description}
+2. Direct Banking Industry Implications:
+   - Specific banking products or services affected
+   - Clear competitive advantages/threats
+   - Regulatory considerations
+   - Customer experience impacts
 
-COMMUNITY IMPACT:
-${companyContext.communityImpact.initiatives.map(i => 
-  `${i.name}:\n${i.metrics.map(m => `- ${m.metric}: ${m.value}`).join('\n')}`
-).join('\n\n')}
+3. Actionable Recommendations:
+   - Specific technologies or solutions to implement
+   - Timeline-based action items
+   - Required investments or resources
+   - Expected ROI or benefits
 
-TEAM DEVELOPMENT:
-Leadership Focus:
-${companyContext.teamDevelopment.leadership.focus.map(f => `- ${f}`).join('\n')}
+Event Name: ${eventName}
+Description: ${description}
 
-Employee Engagement:
-${companyContext.teamDevelopment.engagement.map(e => 
-  `- ${e.metric}: ${e.value}${e.benchmark ? ` (${e.benchmark})` : ''}`
-).join('\n')}
+Key Questions and Answers:
+${questionsAndAnswers}
 
-FUTURE OUTLOOK:
-Strategy:
-${companyContext.futureOutlook.strategy.map(s => `- ${s}`).join('\n')}
-
-Priorities:
-${companyContext.futureOutlook.priorities.map(p => `- ${p}`).join('\n')}
-
-Provide a concise 20-40 word "So What?" analysis explaining why this event might be important for CIBC. 
-Focus on:
-1. Alignment with future strategy
-2. Impact on team development
-3. Community engagement potential
-4. Leadership enhancement opportunities
-5. Employee engagement implications
-6. Sustainable growth contribution
-7. Stakeholder value creation
-
-Be specific and actionable, highlighting direct relevance to our purpose-driven culture, commitment to sustainable growth, and focus on creating enduring value for all stakeholders.
-`;
+Provide a concise analysis (max 150 words) that focuses on specific facts, numbers, and actionable implications. Avoid generic statements.`;
 
   try {
     const completion = await openai.chat.completions.create({

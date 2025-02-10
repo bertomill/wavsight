@@ -110,6 +110,8 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
 
     // Regular RSS/Atom feeds with CORS proxy
     const proxyUrl = `${CORS_PROXY}${encodeURIComponent(source.url)}`;
+    console.log(`Fetching feed from: ${source.url}`);
+    
     const response = await fetchWithTimeout(proxyUrl);
     
     if (!response.ok) {
@@ -121,19 +123,32 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
     }
     
     const feedText = await response.text();
-    const feed = await parser.parseString(feedText);
-
-    return feed.items.map((item) => ({
-      id: item.guid || item.link || `${source.id}-${Date.now()}`,
-      title: item.title || 'Untitled',
-      description: item.contentSnippet || item.description || '',
-      content: item.contentEncoded || item.content || item.description || '',
-      link: item.link || '',
-      pubDate: item.isoDate || item.pubDate || new Date().toISOString(),
-      feedSource: source.name,
-      feedSourceUrl: source.url,
-      categories: [...(item.categories || []), ...source.categories],
-    }));
+    console.log(`Received feed content length: ${feedText.length} characters`);
+    
+    try {
+      const feed = await parser.parseString(feedText);
+      console.log(`Parsed feed items: ${feed.items.length}`);
+      
+      return feed.items.map((item) => {
+        const feedItem = {
+          id: item.guid || item.link || `${source.id}-${Date.now()}`,
+          title: item.title || 'Untitled',
+          description: item.contentSnippet || item.description || '',
+          content: item.contentEncoded || item.content || item.description || '',
+          link: item.link || '',
+          pubDate: item.isoDate || item.pubDate || new Date().toISOString(),
+          feedSource: source.name,
+          feedSourceUrl: source.url,
+          categories: [...(item.categories || []), ...source.categories],
+        };
+        console.log(`Processed feed item: ${feedItem.title}`);
+        return feedItem;
+      });
+    } catch (parseError) {
+      console.error(`Error parsing feed from ${source.url}:`, parseError);
+      console.log('Feed content sample:', feedText.substring(0, 200));
+      throw parseError;
+    }
   } catch (error) {
     const err = error as FetchError;
     console.error(`Error fetching feed from ${source.url}:`, err.message || String(error));

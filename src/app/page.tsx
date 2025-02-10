@@ -6,7 +6,7 @@ import FeedList from '@/components/FeedList';
 import FeedFilter from '@/components/FeedFilter';
 import { fetchAllFeeds } from '@/services/feedService';
 import { mockSources as mockFeeds } from '@/data/mockFeeds';
-import { startOfToday, endOfToday } from 'date-fns';
+import { subDays } from 'date-fns';
 
 export default function Home() {
   const [feeds, setFeeds] = useState<FeedItem[]>([]);
@@ -14,8 +14,8 @@ export default function Home() {
   const [filters, setFilters] = useState<FeedFilters>({
     sources: mockFeeds.map(feed => feed.id),
     dateRange: {
-      start: startOfToday().toISOString(),
-      end: endOfToday().toISOString(),
+      start: subDays(new Date(), 7).toISOString(), // Show last 7 days by default
+      end: new Date().toISOString(),
     },
   });
 
@@ -27,6 +27,7 @@ export default function Home() {
     setLoading(true);
     try {
       const items = await fetchAllFeeds(mockFeeds);
+      console.log('Fetched feeds:', items); // Debug log
       setFeeds(items);
     } catch (error) {
       console.error('Error loading feeds:', error);
@@ -56,6 +57,8 @@ export default function Home() {
 
     return true;
   });
+
+  console.log('Filtered feeds:', filteredFeeds); // Debug log
 
   return (
     <main className="p-8">
