@@ -29,6 +29,12 @@ interface CustomParser extends Parser<CustomFeed, CustomItem> {
   };
 }
 
+type FetchError = {
+  message: string;
+  status?: number;
+  response?: Response;
+};
+
 const parser: CustomParser = new Parser({
   customFields: {
     item: [
@@ -68,7 +74,13 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
     if (source.url.includes('reddit.com')) {
       const jsonUrl = source.url.endsWith('.json') ? source.url : `${source.url}.json`;
       const response = await fetchWithTimeout(jsonUrl);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw {
+          message: `HTTP error! status: ${response.status}`,
+          status: response.status,
+          response
+        } as FetchError;
+      }
       const data = await response.json();
       return parseRedditFeed(data, source);
     }
@@ -76,7 +88,15 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
     // Regular RSS/Atom feeds with CORS proxy
     const proxyUrl = `${CORS_PROXY}${encodeURIComponent(source.url)}`;
     const response = await fetchWithTimeout(proxyUrl);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    if (!response.ok) {
+      throw {
+        message: `HTTP error! status: ${response.status}`,
+        status: response.status,
+        response
+      } as FetchError;
+    }
+    
     const feedText = await response.text();
     const feed = await parser.parseString(feedText);
 
@@ -92,11 +112,8 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
       categories: [...(item.categories || []), ...source.categories],
     }));
   } catch (error) {
-    if (error instanceof Error) {
-      console.error(`Error fetching feed from ${source.url}:`, error.message);
-    } else {
-      console.error(`Error fetching feed from ${source.url}:`, error);
-    }
+    const err = error as FetchError;
+    console.error(`Error fetching feed from ${source.url}:`, err.message || String(error));
     return [];
   }
 }
@@ -130,11 +147,8 @@ export async function fetchAllFeeds(sources: FeedSource[]): Promise<FeedItem[]> 
       new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
     );
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error fetching all feeds:', error.message);
-    } else {
-      console.error('Error fetching all feeds:', error);
-    }
+    const err = error as FetchError;
+    console.error('Error fetching all feeds:', err.message || String(error));
     return [];
   }
 }
