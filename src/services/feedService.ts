@@ -23,16 +23,23 @@ interface CustomItem {
   [key: string]: unknown;
 }
 
-const parser: Parser<CustomFeed, CustomItem> = new Parser({
+interface CustomParser extends Parser<CustomFeed, CustomItem> {
+  customFields: {
+    item: string[];
+  };
+}
+
+const parser: CustomParser = new Parser({
   customFields: {
     item: [
-      ['media:content', 'mediaContent'],
-      ['content:encoded', 'contentEncoded'],
-      ['content', 'content'],
-      ['creator', 'creator'],
+      'creator',
+      'content',
+      'contentSnippet',
+      'contentEncoded',
+      'mediaContent',
     ],
   },
-});
+}) as CustomParser;
 
 // Use a CORS proxy for RSS feeds
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
@@ -73,7 +80,7 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
     const feedText = await response.text();
     const feed = await parser.parseString(feedText);
 
-    return feed.items.map(item => ({
+    return feed.items.map((item) => ({
       id: item.guid || item.link || `${source.id}-${Date.now()}`,
       title: item.title || 'Untitled',
       description: item.contentSnippet || item.description || '',

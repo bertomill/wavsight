@@ -17,6 +17,7 @@ interface TechEvent {
   event_date: string;
   description: string;
   relevance_score: number;
+  so_what: string | null;
   key_questions: { id: string; question: string }[];
   answers: { question_id: string; answer: string }[];
 }
@@ -75,6 +76,85 @@ const columns = [
         ))}
       </ul>
     ),
+  }),
+  columnHelper.accessor('so_what', {
+    header: 'So What?',
+    cell: info => {
+      const row = info.row.original;
+      const [loading, setLoading] = useState(false);
+      const [soWhat, setSoWhat] = useState(row.so_what);
+
+      const generateSoWhat = async () => {
+        setLoading(true);
+        try {
+          const response = await fetch('/api/generate-so-what', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              eventName: row.event_name,
+              description: row.description,
+              questions: row.key_questions,
+              answers: row.answers,
+            }),
+          });
+
+          if (!response.ok) throw new Error('Failed to generate analysis');
+
+          const data = await response.json();
+          setSoWhat(data.soWhat);
+
+          // Update in Supabase
+          await supabase
+            .from('tech_events')
+            .update({ so_what: data.soWhat })
+            .eq('id', row.id);
+
+        } catch (error) {
+          console.error('Error:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="relative">
+          {soWhat ? (
+            <div className="group">
+              <p className="text-sm text-gray-300">{soWhat}</p>
+              <button
+                onClick={generateSoWhat}
+                className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 p-1 text-xs text-gray-400 hover:text-white transition-opacity"
+                title="Regenerate analysis"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={generateSoWhat}
+              disabled={loading}
+              className="px-2 py-1 text-xs bg-[#8B4513] text-white rounded hover:bg-[#A0522D] transition-colors disabled:opacity-50"
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Generating...</span>
+                </div>
+              ) : (
+                'Generate Analysis'
+              )}
+            </button>
+          )}
+        </div>
+      );
+    },
   }),
   columnHelper.display({
     id: 'actions',
