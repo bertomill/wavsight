@@ -1,0 +1,25 @@
+# Help Me Blog
+
+A personal content aggregation and writing assistant tool that helps organize and synthesize information from various sources.
+
+## Purpose
+
+This application aims to streamline the process of:
+1. Collecting content from favorite RSS feeds
+2. Identifying key themes and topics from the collected content
+3. Facilitating the writing process by organizing related content
+
+## Core Features (Planned)
+
+- RSS Feed Integration: Aggregate content from preferred blogs and news sources
+- Theme Extraction: Identify and group related topics from collected content
+- Content Organization: Sort and categorize articles and videos for easy reference
+- Writing Assistant: Interface for composing and organizing written content based on gathered information
+
+## Technical Stack (TBD)
+
+The application will run on port 3001 for development.
+
+## Getting Started
+
+More details about setup and usage will be added as the application develops.
