@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FeedItem, FeedSource, FeedFilters } from '@/types/feed';
+import { FeedItem, FeedFilters } from '@/types/feed';
 import FeedList from '@/components/FeedList';
 import FeedFilter from '@/components/FeedFilter';
 import { fetchAllFeeds } from '@/services/feedService';

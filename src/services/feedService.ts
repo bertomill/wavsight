@@ -1,12 +1,35 @@
-import Parser from 'rss-parser';
 import { FeedItem, FeedSource } from '../types/feed';
+import Parser from 'rss-parser';
 
-const parser = new Parser({
+interface CustomFeed {
+  title: string;
+  description: string;
+  link: string;
+  items: CustomItem[];
+}
+
+interface CustomItem {
+  title?: string;
+  link?: string;
+  pubDate?: string;
+  content?: string;
+  contentSnippet?: string;
+  description?: string;
+  contentEncoded?: string;
+  isoDate?: string;
+  creator?: string;
+  categories?: string[];
+  mediaContent?: string;
+  [key: string]: unknown;
+}
+
+const parser: Parser<CustomFeed, CustomItem> = new Parser({
   customFields: {
     item: [
       ['media:content', 'mediaContent'],
       ['content:encoded', 'contentEncoded'],
       ['content', 'content'],
+      ['creator', 'creator'],
     ],
   },
 });
@@ -56,13 +79,17 @@ export async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
       description: item.contentSnippet || item.description || '',
       content: (item as any).contentEncoded || (item as any).content || item.description || '',
       link: item.link || '',
-      pubDate: item.pubDate || item.isoDate || new Date().toISOString(),
+      pubDate: item.isoDate || item.pubDate || new Date().toISOString(),
       feedSource: source.name,
       feedSourceUrl: source.url,
       categories: [...(item.categories || []), ...source.categories],
     }));
   } catch (error) {
-    console.error(`Error fetching feed from ${source.url}:`, error);
+    if (error instanceof Error) {
+      console.error(`Error fetching feed from ${source.url}:`, error.message);
+    } else {
+      console.error(`Error fetching feed from ${source.url}:`, error);
+    }
     return [];
   }
 }
@@ -89,24 +116,18 @@ function parseRedditFeed(data: any, source: FeedSource): FeedItem[] {
 }
 
 export async function fetchAllFeeds(sources: FeedSource[]): Promise<FeedItem[]> {
-  // Fetch feeds in parallel with a maximum of 5 concurrent requests
-  const results: FeedItem[] = [];
-  const batchSize = 5;
-  
-  for (let i = 0; i < sources.length; i += batchSize) {
-    const batch = sources.slice(i, i + batchSize);
-    const batchPromises = batch.map(source => fetchFeed(source));
-    const batchResults = await Promise.allSettled(batchPromises);
-    
-    batchResults.forEach(result => {
-      if (result.status === 'fulfilled') {
-        results.push(...result.value);
-      }
-    });
+  try {
+    const feedPromises = sources.map(source => fetchFeed(source));
+    const feedsArrays = await Promise.all(feedPromises);
+    return feedsArrays.flat().sort((a, b) => 
+      new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
+    );
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Error fetching all feeds:', error.message);
+    } else {
+      console.error('Error fetching all feeds:', error);
+    }
+    return [];
   }
-  
-  // Sort by date
-  return results.sort((a, b) => 
-    new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
-  );
 }

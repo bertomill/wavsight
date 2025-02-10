@@ -1,5 +1,5 @@
 import { FeedFilters, FeedSource } from '../types/feed';
-import { startOfToday, startOfWeek, endOfToday, isEqual, format } from 'date-fns';
+import { startOfToday, startOfWeek, endOfToday, isEqual } from 'date-fns';
 
 interface FeedFilterProps {
   sources: FeedSource[];
