@@ -70,8 +70,8 @@ const parser: CustomParser = new Parser({
   },
 }) as CustomParser;
 
-// Use a CORS proxy for RSS feeds
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+// Use our own proxy API endpoint for RSS feeds
+const CORS_PROXY = '/api/proxy?url=';
 const FETCH_TIMEOUT = 5000; // 5 seconds timeout
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}) {
