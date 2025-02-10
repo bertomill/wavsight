@@ -22,6 +22,11 @@ interface TechEvent {
   answers: { question_id: string; answer: string }[];
 }
 
+interface TableMeta {
+  onEdit: (event: TechEvent) => void;
+  onDelete: (id: string) => void;
+}
+
 const columnHelper = createColumnHelper<TechEvent>();
 
 const SoWhatCell = ({ row }: { row: TechEvent }) => {
@@ -163,13 +168,13 @@ const columns = [
     cell: props => (
       <div className="flex gap-2">
         <button
-          onClick={() => props.table.options.meta?.onEdit(props.row.original)}
+          onClick={() => (props.table.options.meta as TableMeta).onEdit(props.row.original)}
           className="px-2 py-1 text-xs bg-[#8B4513] text-white rounded hover:bg-[#A0522D] transition-colors"
         >
           Edit
         </button>
         <button
-          onClick={() => props.table.options.meta?.onDelete(props.row.original.id)}
+          onClick={() => (props.table.options.meta as TableMeta).onDelete(props.row.original.id)}
           className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
         >
           Delete
@@ -221,7 +226,7 @@ export default function EventsPage() {
     }
   };
 
-  const table = useReactTable({
+  const table = useReactTable<TechEvent>({
     data: events,
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -231,7 +236,7 @@ export default function EventsPage() {
         setShowAddModal(true);
       },
       onDelete: handleDelete,
-    },
+    } as TableMeta,
   });
 
   return (
