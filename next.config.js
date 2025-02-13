@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Port is configured via CLI or env variables, not in next.config
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'bufferutil', 'utf-8-validate'];
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;
