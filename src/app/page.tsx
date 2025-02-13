@@ -4,19 +4,21 @@ import { useState, useEffect } from 'react';
 import { FeedItem, FeedFilters } from '@/types/feed';
 import FeedList from '@/components/FeedList';
 import FeedFilter from '@/components/FeedFilter';
+import PersonalArticles from '@/components/PersonalArticles';
+import NewsSummary from '@/components/NewsSummary';
+import PersonalProfile from '@/components/PersonalProfile';
 import { fetchAllFeeds } from '@/services/feedService';
-import { mockSources as mockFeeds } from '@/data/mockFeeds';
-import { subDays } from 'date-fns';
+import { feedSources } from '@/data/feedSources';
+
+const INITIAL_FEED_LIMIT = 8;
+const TOTAL_FEEDS_TO_LOAD = 50;
 
 export default function Home() {
   const [feeds, setFeeds] = useState<FeedItem[]>([]);
+  const [personalArticles, setPersonalArticles] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FeedFilters>({
-    sources: mockFeeds.map(feed => feed.id),
-    dateRange: {
-      start: subDays(new Date(), 7).toISOString(), // Show last 7 days by default
-      end: new Date().toISOString(),
-    },
+    sources: feedSources.map(feed => feed.name),
   });
 
   useEffect(() => {
@@ -26,9 +28,19 @@ export default function Home() {
   const loadFeeds = async () => {
     setLoading(true);
     try {
-      const items = await fetchAllFeeds(mockFeeds);
-      console.log('Fetched feeds:', items); // Debug log
+      const items = await fetchAllFeeds(
+        feedSources.filter(feed => feed.id !== 'personal-medium'),
+        TOTAL_FEEDS_TO_LOAD
+      );
+      console.log('Loaded feeds:', items.length);
       setFeeds(items);
+
+      // Load personal articles
+      const personal = await fetchAllFeeds(
+        [feedSources.find(feed => feed.id === 'personal-medium')!],
+        10
+      );
+      setPersonalArticles(personal);
     } catch (error) {
       console.error('Error loading feeds:', error);
     } finally {
@@ -37,50 +49,46 @@ export default function Home() {
   };
 
   const filteredFeeds = feeds.filter(item => {
-    // Filter by source
-    if (!filters.sources.includes(item.feedSource)) {
+    // Check if it's a job posting by looking for common job-related keywords in title and description
+    const jobKeywords = ['job', 'hiring', 'career', 'position', 'engineer', 'developer', 'analyst', 'manager', '@ ', 'software engineer'];
+    const isJobPosting = jobKeywords.some(keyword => 
+      item.title.toLowerCase().includes(keyword.toLowerCase()) ||
+      (item.description && item.description.toLowerCase().includes(keyword.toLowerCase()))
+    );
+    
+    if (isJobPosting) {
       return false;
     }
 
-    // Filter by date range
-    if (filters.dateRange.start || filters.dateRange.end) {
-      const itemDate = new Date(item.pubDate).getTime();
-      
-      if (filters.dateRange.start && itemDate < new Date(filters.dateRange.start).getTime()) {
-        return false;
-      }
-      
-      if (filters.dateRange.end && itemDate > new Date(filters.dateRange.end).getTime()) {
-        return false;
-      }
+    // Source filter
+    if (!filters.sources.includes(item.feedSource)) {
+      return false;
     }
 
     return true;
   });
 
-  console.log('Filtered feeds:', filteredFeeds); // Debug log
-
   return (
-    <main className="p-8">
+    <main className="p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[300px,1fr] gap-6">
-          <aside>
+        <div className="grid grid-cols-1 lg:grid-cols-[250px,1fr] gap-4">
+          <aside className="lg:sticky lg:top-4 space-y-2">
+            <PersonalProfile />
+            <NewsSummary articles={feeds} personalArticles={personalArticles} />
+            <PersonalArticles feedUrl="https://bertomill.medium.com/feed" />
             <FeedFilter
-              sources={mockFeeds}
+              sources={feedSources.filter(feed => feed.id !== 'personal-medium')}
               filters={filters}
               onFiltersChange={setFilters}
             />
           </aside>
-
-          <section>
-            {loading ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#8B4513]"></div>
-              </div>
-            ) : (
-              <FeedList items={filteredFeeds} />
-            )}
-          </section>
+          <div>
+            <FeedList 
+              feeds={feeds} 
+              loading={loading} 
+              pageSize={INITIAL_FEED_LIMIT} 
+            />
+          </div>
         </div>
       </div>
     </main>

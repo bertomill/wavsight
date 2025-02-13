@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/utils/supabase';
 import { format } from 'date-fns';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
 import {
   useReactTable,
   getCoreRowModel,
@@ -16,16 +18,23 @@ interface TechEvent {
   event_name: string;
   event_date: string;
   description: string;
+  full_content: string;
   relevance_score: number;
+  event_link: string;
   so_what: string | null;
   key_questions: { id: string; question: string }[];
   answers: { question_id: string; answer: string }[];
+  event_type_id: string | null;
+  custom_event_type: string | null;
+  event_type?: { name: string } | null;
 }
 
 interface TableMeta {
   onEdit: (event: TechEvent) => void;
   onDelete: (id: string) => void;
 }
+
+type ViewMode = 'table' | 'calendar';
 
 const columnHelper = createColumnHelper<TechEvent>();
 
@@ -105,208 +114,319 @@ const SoWhatCell = ({ row }: { row: TechEvent }) => {
   );
 };
 
-const columns = [
-  columnHelper.accessor('event_name', {
-    header: 'Event Name',
-    cell: info => info.getValue(),
-  }),
-  columnHelper.accessor('event_date', {
-    header: 'Date',
-    cell: info => format(new Date(info.getValue()), 'MMM d, yyyy'),
-  }),
-  columnHelper.accessor('relevance_score', {
-    header: 'Relevance',
-    cell: info => {
-      const score = info.getValue();
-      return (
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <svg
-              key={star}
-              className={`w-4 h-4 ${star <= score ? 'text-yellow-500' : 'text-gray-600'}`}
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          ))}
-        </div>
-      );
-    },
-  }),
-  columnHelper.accessor('description', {
-    header: 'Description',
-    cell: info => info.getValue(),
-  }),
-  columnHelper.accessor('key_questions', {
-    header: 'Key Questions',
-    cell: info => (
-      <ul className="list-disc pl-4">
-        {info.getValue().map(q => (
-          <li key={q.id}>{q.question}</li>
-        ))}
-      </ul>
-    ),
-  }),
-  columnHelper.accessor('answers', {
-    header: 'Answers',
-    cell: info => (
-      <ul className="list-disc pl-4">
-        {info.getValue().map(a => (
-          <li key={a.question_id}>{a.answer}</li>
-        ))}
-      </ul>
-    ),
-  }),
-  columnHelper.accessor('so_what', {
-    header: 'So What?',
-    cell: info => <SoWhatCell row={info.row.original} />,
-  }),
-  columnHelper.display({
-    id: 'actions',
-    header: 'Actions',
-    cell: props => (
-      <div className="flex gap-2">
-        <button
-          onClick={() => (props.table.options.meta as TableMeta).onEdit(props.row.original)}
-          className="px-2 py-1 text-xs bg-[#8B4513] text-white rounded hover:bg-[#A0522D] transition-colors"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => (props.table.options.meta as TableMeta).onDelete(props.row.original.id)}
-          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-        >
-          Delete
-        </button>
-      </div>
-    ),
-  }),
-];
-
 export default function EventsPage() {
   const [events, setEvents] = useState<TechEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<TechEvent | null>(null);
-
-  const fetchEvents = async () => {
-    try {
-      const response = await fetch('/api/events');
-      if (!response.ok) throw new Error('Failed to fetch events');
-      const data = await response.json();
-      setEvents(data);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<TechEvent | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
 
   useEffect(() => {
     fetchEvents();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this event?')) {
-      try {
-        const { error } = await supabase
-          .from('tech_events')
-          .delete()
-          .eq('id', id);
+  const fetchEvents = async () => {
+    const { data, error } = await supabase
+      .from('tech_events')
+      .select(`
+        *,
+        event_type:event_type_id(name)
+      `)
+      .order('relevance_score', { ascending: false });
 
-        if (error) throw error;
-        fetchEvents();
-      } catch (error) {
-        console.error('Error deleting event:', error);
-      }
+    if (error) {
+      console.error('Error fetching events:', error);
+      return;
     }
+
+    setEvents(data || []);
   };
 
-  const table = useReactTable<TechEvent>({
+  const handleEdit = (event: TechEvent) => {
+    setSelectedEvent(event);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase
+      .from('tech_events')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      return;
+    }
+
+    fetchEvents();
+  };
+
+  const columns = [
+    columnHelper.accessor('event_name', {
+      header: 'Event Name',
+      cell: info => info.getValue().replace(/^7p\s*/, ''),
+    }),
+    columnHelper.accessor(row => row.event_type?.name || row.custom_event_type || 'N/A', {
+      id: 'event_type',
+      header: 'Type',
+      cell: info => info.getValue(),
+    }),
+    columnHelper.accessor('event_link', {
+      header: 'Event Link',
+      cell: info => info.getValue() ? (
+        <a
+          href={info.getValue()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#8B4513] hover:text-[#A0522D] underline"
+        >
+          View Event
+        </a>
+      ) : null,
+    }),
+    columnHelper.accessor('event_date', {
+      header: 'Date',
+      cell: info => format(new Date(info.getValue()), 'MMM d, yyyy'),
+    }),
+    columnHelper.accessor('relevance_score', {
+      header: 'Relevance',
+      cell: info => (
+        <div className="flex">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <span
+              key={star}
+              className={`text-lg ${
+                star <= info.getValue()
+                  ? 'text-yellow-400'
+                  : 'text-gray-400'
+              }`}
+            >
+              ★
+            </span>
+          ))}
+        </div>
+      ),
+    }),
+    columnHelper.accessor('full_content', {
+      header: 'Full Content',
+      cell: info => {
+        const content = info.getValue();
+        if (!content) return null;
+        
+        // Show first 200 characters with ellipsis if longer
+        const truncated = content.length > 200 ? content.slice(0, 200) + '...' : content;
+        
+        return (
+          <div className="group relative">
+            <div className="text-sm text-gray-300">{truncated}</div>
+            {content.length > 200 && (
+              <div className="hidden group-hover:block absolute z-10 left-0 top-full mt-2 p-4 bg-gray-800 rounded-lg shadow-lg max-w-2xl">
+                <div className="text-sm text-gray-300 whitespace-pre-wrap">{content}</div>
+              </div>
+            )}
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor('description', {
+      header: 'Recap',
+      cell: info => info.getValue(),
+    }),
+    columnHelper.accessor('key_questions', {
+      header: 'Key Questions',
+      cell: info => (
+        <ul className="list-disc pl-4">
+          {info.getValue().map(q => (
+            <li key={q.id}>{q.question}</li>
+          ))}
+        </ul>
+      ),
+    }),
+    columnHelper.accessor('answers', {
+      header: 'Answers',
+      cell: info => (
+        <ul className="list-disc pl-4">
+          {info.getValue().map(a => (
+            <li key={a.question_id}>{a.answer}</li>
+          ))}
+        </ul>
+      ),
+    }),
+    columnHelper.accessor('so_what', {
+      header: 'So What?',
+      cell: info => <SoWhatCell row={info.row.original} />,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      cell: info => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleEdit(info.row.original)}
+            className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => handleDelete(info.row.original.id)}
+            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    }),
+  ];
+
+  const table = useReactTable({
     data: events,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    meta: {
-      onEdit: (event: TechEvent) => {
-        setEditingEvent(event);
-        setShowAddModal(true);
-      },
-      onDelete: handleDelete,
-    } as TableMeta,
   });
 
+  const calendarEvents = events.map(event => ({
+    title: `[${event.event_type?.name || event.custom_event_type || 'Event'}] ${event.event_name.replace(/^7p\s*/, '')}`,
+    date: event.event_date,
+    extendedProps: {
+      description: event.description,
+      relevance_score: event.relevance_score,
+      id: event.id
+    },
+    classNames: `relevance-${event.relevance_score}`
+  }));
+
   return (
-    <main className="p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Tech Events</h1>
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-white">Tech Events</h1>
+        <div className="flex gap-4 items-center">
+          <div className="flex bg-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-4 py-2 rounded-md text-sm transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-[#8B4513] text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`px-4 py-2 rounded-md text-sm transition-colors ${
+                viewMode === 'calendar'
+                  ? 'bg-[#8B4513] text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Calendar
+            </button>
+          </div>
           <button
             onClick={() => {
-              setEditingEvent(null);
-              setShowAddModal(true);
+              setSelectedEvent(null);
+              setIsModalOpen(true);
             }}
             className="px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#A0522D] transition-colors"
           >
             Add Event
           </button>
         </div>
-
-        <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-lg rounded-xl p-6 overflow-x-auto">
-          {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#8B4513]"></div>
-            </div>
-          ) : events.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-400">No events found. Add your first event!</p>
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                {table.getHeaderGroups().map(headerGroup => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map(header => (
-                      <th
-                        key={header.id}
-                        className="text-left p-3 text-sm font-medium text-gray-400 border-b border-[rgba(255,255,255,0.1)]"
-                      >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map(row => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)]"
-                  >
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id} className="p-3 text-sm text-gray-300">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {showAddModal && (
-          <AddEditEventModal
-            isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            event={editingEvent}
-            onEventAdded={fetchEvents}
-          />
-        )}
       </div>
-    </main>
+
+      {viewMode === 'table' ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-[rgba(255,255,255,0.08)] rounded-lg">
+            <thead>
+              {table.getHeaderGroups().map(headerGroup => (
+                <tr key={headerGroup.id}>
+                  {headerGroup.headers.map(header => (
+                    <th
+                      key={header.id}
+                      className="px-4 py-3 text-left text-sm font-medium text-gray-400 border-b border-[rgba(255,255,255,0.1)]"
+                    >
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map(row => (
+                <tr
+                  key={row.id}
+                  className="hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <td
+                      key={cell.id}
+                      className="px-4 py-3 text-sm text-gray-300 border-b border-[rgba(255,255,255,0.1)]"
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-[rgba(255,255,255,0.08)] rounded-lg p-6">
+          <style jsx global>{`
+            .fc-event {
+              white-space: normal !important;
+              font-size: 0.75rem !important;
+              line-height: 1.1 !important;
+              padding: 2px 4px !important;
+            }
+            .fc-event-time {
+              display: none !important;
+            }
+            .relevance-5 { background-color: #8B4513 !important; border-color: #A0522D !important; }
+            .relevance-4 { background-color: #9B5523 !important; border-color: #B0623D !important; }
+            .relevance-3 { background-color: #AB6533 !important; border-color: #C0724D !important; }
+            .relevance-2 { background-color: #BB7543 !important; border-color: #D0825D !important; }
+            .relevance-1 { background-color: #CB8553 !important; border-color: #E0926D !important; }
+          `}</style>
+          <FullCalendar
+            plugins={[dayGridPlugin]}
+            initialView="dayGridMonth"
+            events={calendarEvents}
+            eventClick={(info) => {
+              const event = events.find(e => e.id === info.event.extendedProps.id);
+              if (event) {
+                handleEdit(event);
+              }
+            }}
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth'
+            }}
+            height="auto"
+            eventDisplay="block"
+            eventTextColor="white"
+            eventClassNames="cursor-pointer hover:brightness-110 transition-all"
+            dayHeaderClassNames="text-gray-400"
+            dayCellClassNames="text-gray-300"
+          />
+        </div>
+      )}
+
+      <AddEditEventModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedEvent(null);
+        }}
+        event={selectedEvent}
+        onEventAdded={fetchEvents}
+      />
+    </div>
   );
 }

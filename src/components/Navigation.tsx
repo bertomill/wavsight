@@ -17,7 +17,7 @@ export default function Navigation() {
               href="/"
               className="text-xl font-bold text-white hover:text-[#8B4513] transition-colors"
             >
-              My Feed
+              WaveSight
             </Link>
             <div className="hidden md:block ml-10">
               <div className="flex items-center space-x-4">
@@ -29,7 +29,7 @@ export default function Navigation() {
                       : 'text-gray-300 hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
                   }`}
                 >
-                  Feed
+                  My Feed
                 </Link>
                 <Link
                   href="/events"
@@ -40,6 +40,26 @@ export default function Navigation() {
                   }`}
                 >
                   Tech Events
+                </Link>
+                <Link
+                  href="/ai-pipeline"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive('/ai-pipeline')
+                      ? 'text-white bg-[rgba(255,255,255,0.1)]'
+                      : 'text-gray-300 hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
+                  }`}
+                >
+                  AI Pipeline
+                </Link>
+                <Link
+                  href="/creator"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive('/creator')
+                      ? 'text-white bg-[rgba(255,255,255,0.1)]'
+                      : 'text-gray-300 hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
+                  }`}
+                >
+                  Creator
                 </Link>
               </div>
             </div>
@@ -63,7 +83,7 @@ export default function Navigation() {
                 : 'text-gray-300 hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
             }`}
           >
-            Feed
+            My Feed
           </Link>
           <Link
             href="/events"
@@ -74,6 +94,26 @@ export default function Navigation() {
             }`}
           >
             Tech Events
+          </Link>
+          <Link
+            href="/ai-pipeline"
+            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+              isActive('/ai-pipeline')
+                ? 'text-white bg-[rgba(255,255,255,0.1)]'
+                : 'text-gray-300 hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
+            }`}
+          >
+            AI Pipeline
+          </Link>
+          <Link
+            href="/creator"
+            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+              isActive('/creator')
+                ? 'text-white bg-[rgba(255,255,255,0.1)]'
+                : 'text-gray-300 hover:text-white hover:bg-[rgba(255,255,255,0.05)]'
+            }`}
+          >
+            Creator
           </Link>
         </div>
       </div>
