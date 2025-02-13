@@ -1,8 +1,6 @@
-import type { NextConfig } from "next";
-
 /** @type {import('next').NextConfig} */
-const nextConfig: NextConfig = {
+const nextConfig = {
   // Port is configured via CLI or env variables, not in next.config
 };
 
-export default nextConfig;
+module.exports = nextConfig;
