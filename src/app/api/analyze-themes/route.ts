@@ -57,6 +57,10 @@ export async function POST(request: Request) {
     });
 
     const response = completion.choices[0].message.content;
+    if (!response) {
+      throw new Error('No response content from OpenAI');
+    }
+    
     return NextResponse.json(JSON.parse(response));
   } catch (error) {
     console.error('Error analyzing themes:', error);
